@@ -6,6 +6,44 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from dataclasses import dataclass
+
+
+@dataclass
+class emoji_collection:
+    positive_image: np.ndarray
+    negative_image: np.ndarray
+
+
+def generate_emoji_collection(file_pos, file_neg):
+    '''
+    Creates an instance of emoji_collection.
+
+    Parameters
+    ----------
+    file_pos: str
+        filename of positive image, relative to 'images' folder
+    file_neg: str
+        filename of negative image, relative to 'images' folder
+
+    Returns
+    -------
+    emoji_col: emoji_collection
+    An instance of emoji_collection.
+    '''
+    package_directory = os.path.dirname(os.path.abspath(__file__))
+    pos_file_full_path = os.path.join(package_directory, '..', '..', 'images', file_pos)
+    neg_file_full_path = os.path.join(package_directory, '..', '..', 'images', file_neg)
+
+    pos_img = cv.imread(pos_file_full_path)
+    neg_img = cv.imread(neg_file_full_path)
+    if pos_img is None:
+        raise ValueError(f'{file_pos} is an invalid filename.')
+    elif neg_img is None:
+        raise ValueError(f'{file_neg} is an invalid filename.')
+
+    emoji_col = emoji_collection(pos_img, neg_img)
+    return emoji_col
 
 
 def display_image(image, title='', figsize=None):
@@ -22,48 +60,31 @@ def display_image(image, title='', figsize=None):
     Returns
     -------
     None.
-
     '''
     if figsize != '':
-        plt.figure(figsize=figsize, dpi= 100, facecolor='w', edgecolor='k')
+        plt.figure(figsize=figsize, dpi=100, facecolor='w', edgecolor='k')
     image = image.astype('float32') * 255
-    if image.ndim == 3:    # color image
-        plt.imshow(cv.cvtColor(image, cv.COLOR_BGRA2RGB).astype('uint8'), cmap='cubehelix')        
-    elif image.ndim == 2:    # grayscale image
+    if image.ndim == 3:  # color image
+        plt.imshow(cv.cvtColor(image, cv.COLOR_BGRA2RGB).astype('uint8'), cmap='cubehelix')
+    elif image.ndim == 2:  # grayscale image
         plt.imshow(image, cmap='gray')
     # plt.colorbar()
     plt.title(title)
     plt.show()
 
 
-
 class emotion_representer:
-
-    def __init__(self, canvas_width, canvas_height):
+    def __init__(self, canvas_width, canvas_height, pos_img_filename='happy.jpg', neg_image_filename='sad.jpg'):
         self.canvas_width = canvas_width
         self.canvas_height = canvas_height
-        self.initialize_happiness_images()
-        # self.initialize_engagement_images()
+        self.emoji_col = generate_emoji_collection(pos_img_filename, neg_image_filename)
+
         self.font = cv.FONT_HERSHEY_SIMPLEX
         self.org = (50, 50)
         self.font_scale = 2
         self.color = (0, 255, 0)
         self.thickness = 5
         self.imgtext = 'text'
-
-    def initialize_happiness_images(self):
-        package_directory = os.path.dirname(os.path.abspath(__file__))
-        happy_image_file = os.path.join(package_directory, 'images/happy.jpg')
-        sad_image_file = os.path.join(package_directory,'images/sad.jpg')
-        self.happy_image = cv.imread(happy_image_file)
-        self.sad_image = cv.imread(sad_image_file)
-
-    def initialize_engagement_images(self):
-        package_directory = os.path.dirname(os.path.abspath(__file__))
-        engaged_image_file = os.path.join(package_directory, 'images/engaged.jpg')
-        disengaged_image_file = os.path.join(package_directory, 'images/disengaged.jpg')
-        self.engaged_image = cv.imread(engaged_image_file)
-        self.disengaged_image = cv.imread(disengaged_image_file)
 
     """
         Reduces the size(width and height) of the given image by 
@@ -112,21 +133,12 @@ class emotion_representer:
         return (value1, value2)
 
     """
-        Returns the resized happiness images based on the emotion percentage 
+        Returns the resized images based on the emotion percentage 
     """
-    def get_resized_happiness_images(self, prob_a, prob_b):
+    def get_resized_images(self, prob_a, prob_b):
         ratio_a, ratio_b = self.calculate_new_ratio(prob_a, prob_b)
-        img1 = self.reduce_size_by_percentage(self.happy_image, ratio_a)
-        img2 = self.reduce_size_by_percentage(self.sad_image, ratio_b)
-        return [img1, img2]
-
-    """
-        Returns the resized engagedness images based on the emotion percentage 
-    """
-    def get_resized_engagedness_images(self, prob_a, prob_b):
-        ratio_a, ratio_b = self.calculate_new_ratio(prob_a, prob_b)
-        img1 = self.reduce_size_by_percentage(self.engaged_image, ratio_a)
-        img2 = self.reduce_size_by_percentage(self.disengaged_image, ratio_b)
+        img1 = self.reduce_size_by_percentage(self.emoji_col.positive_image, ratio_a)
+        img2 = self.reduce_size_by_percentage(self.emoji_col.negative_image, ratio_b)
         return [img1, img2]
 
     """
@@ -138,44 +150,20 @@ class emotion_representer:
         a_channel = np.ones(img.shape, dtype=float) - (opacity / 100)
         return img * a_channel
 
-    def produce_happiness_repr(self, happy_prob, sad_prob, unknown_prob):
-        size_modified = self.concat_n_images(self.get_resized_happiness_images(happy_prob, sad_prob))
-        opacity_modified = self.getRGBA(unknown_prob, size_modified)
+    def get_repr(self, pos_emotion_prob, neg_emotion_prob, unknown_emotion_prob):
+        # check if non-negative probabilities are provided
+        assert pos_emotion_prob >= 0
+        assert neg_emotion_prob >= 0
+        assert unknown_emotion_prob >= 0
+
+        # if sum of probabilities are not 1; make their sum to 1
+        sum_of_probabilities = pos_emotion_prob + neg_emotion_prob + unknown_emotion_prob
+        if (sum_of_probabilities - 1) < 0.0001:
+            pos_emotion_prob = pos_emotion_prob / sum_of_probabilities
+            neg_emotion_prob = neg_emotion_prob / sum_of_probabilities
+            unknown_emotion_prob = unknown_emotion_prob / sum_of_probabilities
+
+        size_modified = self.concat_n_images(self.get_resized_images(pos_emotion_prob, neg_emotion_prob))
+        opacity_modified = self.getRGBA(unknown_emotion_prob, size_modified)
         return opacity_modified
-
-    def produce_engagedness_repr(self, engaged_prob, disengaged_prob, unknown_prob):
-        size_modified = self.concat_n_images(self.get_resized_engagedness_images(engaged_prob, disengaged_prob))
-        opacity_modified = self.getRGBA(unknown_prob, size_modified)
-        return opacity_modified
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
