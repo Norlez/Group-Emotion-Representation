@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division
+
+import cv2
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -144,11 +146,31 @@ class emotion_representer:
     """
         Changes the Opacity/Alpha Value of an given image
     """
-    def getRGBA(self, opacity, src):
+    def getRGBA(self, src, opacity):
         img = np.array(src, dtype=float)
-        img /= 255.0
-        a_channel = np.ones(img.shape, dtype=float) - (opacity / 100)
-        return img * a_channel
+        img = img / 255.0
+        a_channel = np.ones(img.shape, dtype=float) - opacity / 100
+        return img * a_channel * 255
+
+    def add_overlay(self, image, alpha=0.5):
+        # image = np.array(image / 255.0, dtype=float)
+
+        overlay = image.copy()
+        # overlay = np.ones(image.shape, dtype=float)
+
+        output = image.copy()
+        cv2.rectangle(overlay, (0, 0), (overlay.shape[1], overlay.shape[0]), (255, 255, 255), -1)
+        output = cv2.addWeighted(overlay, alpha, output, 1 - alpha, 0)
+        return output
+        # return np.array(output * 255, dtype=np.uint8)
+
+    def add_overlay1(self, image, alpha=0.1):
+        overlay = image.copy()
+        x, y, w, h = 0, 0, image.shape[1], image.shape[0]
+        cv.rectangle(overlay, (x, y), (x + w, y + h), (0, 0, 255), -1)
+        output = cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0)
+        return output
+
 
     def get_repr(self, pos_emotion_prob, neg_emotion_prob, unknown_emotion_prob):
         # check if non-negative probabilities are provided
@@ -158,12 +180,17 @@ class emotion_representer:
 
         # if sum of probabilities are not 1; make their sum to 1
         sum_of_probabilities = pos_emotion_prob + neg_emotion_prob + unknown_emotion_prob
-        if (sum_of_probabilities - 1) < 0.0001:
+        if abs(sum_of_probabilities - 1) > 0.0001:
             pos_emotion_prob = pos_emotion_prob / sum_of_probabilities
             neg_emotion_prob = neg_emotion_prob / sum_of_probabilities
             unknown_emotion_prob = unknown_emotion_prob / sum_of_probabilities
 
         size_modified = self.concat_n_images(self.get_resized_images(pos_emotion_prob, neg_emotion_prob))
-        opacity_modified = self.getRGBA(unknown_emotion_prob, size_modified)
+        size_modified = np.array(size_modified * 255, dtype=np.uint8) # revert back to 255 value
+        # display_image(size_modified)
+        # opacity_modified = self.getRGBA(size_modified, unknown_emotion_prob)
+        opacity_modified = self.add_overlay(size_modified, alpha=unknown_emotion_prob)
+        # opacity_modified = self.add_overlay1(size_modified, alpha=unknown_emotion_prob)
         return opacity_modified
+
 
