@@ -5,6 +5,7 @@ from __future__ import division
 
 import cv2
 import cv2 as cv
+import numpy
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -76,7 +77,7 @@ def display_image(image, title='', figsize=None):
     """
     if figsize != '':
         plt.figure(figsize=figsize, dpi=100, facecolor='w', edgecolor='k')
-    image = image.astype('float32') * 255
+    # image = image.astype('float32') * 255
     if image.ndim == 3:  # color image
         plt.imshow(cv.cvtColor(image, cv.COLOR_BGRA2RGB).astype('uint8'), cmap='cubehelix')
     elif image.ndim == 2:  # grayscale image
@@ -210,6 +211,7 @@ class emotion_representer:
         ratio_a, ratio_b = self.calculate_new_ratio(prob_a, prob_b)
         img1 = self.reduce_size_by_percentage(self.emoji_col.positive_image, ratio_a)
         img2 = self.reduce_size_by_percentage(self.emoji_col.negative_image, ratio_b)
+
         return [img1, img2]
 
     def getRGBA(self, image, opacity):
@@ -268,11 +270,24 @@ class emotion_representer:
         size_modified = self.concat_n_images(self.get_resized_images(pos_emotion_prob, neg_emotion_prob))
 
         # in case the emotion probabilities are [0, 0, 100]
-        # print(f'size_modified: {size_modified}, type: {type(size_modified)}, shape: {size_modified.shape}')
         if size_modified.shape == (0, 0, 3):
             size_modified = np.ones((self.canvas_width, self.canvas_height, 3)) * 255
 
+
+        # add one column or rows of zeros to size_modifed so that it matches to self.canvas_width and self.canvas.height
+        # TODO: hacky solution; make it right later
+        width_deficiency = self.canvas_width - size_modified.shape[1]
+        width_correcting_patch = np.ones((size_modified.shape[0], width_deficiency, 3)) * 255
+        if width_deficiency > 0:
+            size_modified = np.hstack((size_modified, width_correcting_patch))
+
+        height_deficiency = self.canvas_height - size_modified.shape[0]
+        height_correcting_patch = np.ones((height_deficiency, size_modified.shape[1], 3)) * 255
+        if height_deficiency > 0:
+            size_modified = np.vstack((size_modified, height_correcting_patch))
+
         # size_modified = np.array(size_modified * 255, dtype=np.uint8) # revert back to 255 value
         opacity_modified = self.getRGBA(size_modified, unknown_emotion_prob)
-
-        return opacity_modified / 255
+        opacity_modified = opacity_modified.astype(numpy.uint8)
+        return opacity_modified
+        # return opacity_modified / 255
