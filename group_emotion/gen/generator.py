@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import numpy as np
 import random
 
 def softmax(z):
-    '''
+    """
     Turns a vector of real values to another vector of real values whose sum is 1. 
 
     Parameters
@@ -15,14 +14,14 @@ def softmax(z):
         
     Returns
     -------
-    softmax_output : numpy.ndarray
+    numpy.ndarray
         Softmax of the input vector.
-
-    '''
+    """
     return np.exp(z) / np.sum(np.exp(z))
 
+
 def update_probability(current_probability, transition_matrix):
-    '''
+    """
     Updates the probability by one step using a Markov transition matrix.
     
     Parameters
@@ -34,13 +33,14 @@ def update_probability(current_probability, transition_matrix):
     
     Returns
     -------
-    updated_probability : numpy.ndarray
+    numpy.ndarray
         probability updated by one step
-    '''
+    """
     return np.dot(current_probability, transition_matrix)
 
+
 def change_transition_matrix(transition_matrix, change_probability=0.2):
-    '''
+    """
     Randomly modifies the Markov transition matrix (row-wise).
     
     Parameters
@@ -54,7 +54,7 @@ def change_transition_matrix(transition_matrix, change_probability=0.2):
     -------
     transition_matrix : numpy.ndarray
         the updated transition matrix
-    '''
+    """
     for i in range(3):
         if random.uniform(0, 1) > (1.0 - change_probability):
             row = np.array([random.randint(0, 10), random.randint(0, 10), random.randint(0, 10)])
