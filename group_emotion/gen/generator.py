@@ -3,6 +3,10 @@
 import numpy as np
 import random
 
+# to make random numbers predictable, for debugging purpose
+np.random.seed(0)
+random.seed(0)
+
 def softmax(z):
     """
     Turns a vector of real values to another vector of real values whose sum is 1. 
